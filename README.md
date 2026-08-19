@@ -1,16 +1,33 @@
-# new_star_pop
+# New Star Pop
 
-A new Flutter project.
+New Star Soccer'ın TR Pop girl band / boy band üye kariyeri versiyonu — tererpop.com için geliştirilen bir **mobil oyun** prototipi (Flutter, Android + iOS).
 
-## Getting Started
+NSS'in "maça çık, kritik anları oyna" döngüsü burada "sahneye çık, kritik sahne anlarını oyna" döngüsüne dönüşür:
 
-This project is a starting point for a Flutter application.
+| NSS | New Star Pop |
+|---|---|
+| Maç | Konser (Sahneye Çık) |
+| Şut anı | Ritim tutma mini-oyunu (Perfect/İYİ/KAÇTI) |
+| Frikik | Teleprompter arızası — şarkı sözü ezberleme krizi |
+| Pas seçimi | Bridge'de spotlight paylaşımı (hangi üyeye destek) |
+| Basın röportajı | Talk show röportajı (medya/menajer/sponsor ilişkileri) |
+| Kontrat müzakeresi | Sezon sonu kontrat / yükselme-düşme |
+| At yarışı pasif geliri | Hayran kulübü aboneliği |
+| Kariyer skoru | Efsane Skoru (solo kariyere geçiş) |
 
-A few resources to get you started if this is your first Flutter project:
+## Kurulum
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+1. Flutter SDK kur: https://docs.flutter.dev/get-started/install
+2. `flutter pub get`
+3. **Android:** `flutter run` (emülatör veya cihazda) veya `flutter build apk`
+4. **iOS:** `flutter build ios` (macOS + Xcode gerekir)
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Dikey (portrait) ekran hedeflenmiştir; NSS gibi kısa oturumlu mobil oyun.
+
+## Mimari
+
+- `lib/core/` — kariyer veri modeli, Riverpod provider, neon sahne teması
+- `lib/games/` — ritim oyunu, söz ezberleme, spotlight, röportaj, konser akışı, dilemma kartları
+- `lib/screens/` — başlangıç (isim + girl/boy band), ana hub
+
+Durum yönetimi: Riverpod + Flutter Hooks.
