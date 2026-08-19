@@ -261,25 +261,7 @@ class _Intro extends HookConsumerWidget {
             return Expanded(
               child: GestureDetector(
                 onTap: () =>
-                    ref.read(careerProvider.notifier).state = CareerState(
-                  playerName: state.playerName,
-                  isGirlBand: state.isGirlBand,
-                  stage: state.stage,
-                  hype: state.hype,
-                  voice: state.voice,
-                  fame: state.fame,
-                  money: state.money,
-                  careerScore: state.careerScore,
-                  season: state.season,
-                  members: state.members,
-                  managerRelation: state.managerRelation,
-                  fansRelation: state.fansRelation,
-                  sponsorRelation: state.sponsorRelation,
-                  mediaRelation: state.mediaRelation,
-                  learnedSongs: state.learnedSongs,
-                  scandals: state.scandals,
-                  style: s,
-                ),
+                    ref.read(careerProvider.notifier).setStyle(s),
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 6),
                   padding: const EdgeInsets.all(12),
@@ -347,7 +329,7 @@ class _Finale extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(careerProvider);
+    // (state bu ekranda doğrudan kullanılmaz)
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [

@@ -6,6 +6,52 @@ class CareerNotifier extends StateNotifier<CareerState> {
   CareerNotifier() : super(CareerState(playerName: 'Ayşe', isGirlBand: true));
 
   /// Yeni kariyer başlat
+  /// Hayran kulübü pasif geliri (NSS at yarışı karşılığı)
+  /// Sahne stilini ayarla (NSS play style karşılığı)
+  void setStyle(StageStyle s) {
+    state = CareerState(
+      playerName: state.playerName,
+      isGirlBand: state.isGirlBand,
+      stage: state.stage,
+      hype: state.hype,
+      voice: state.voice,
+      fame: state.fame,
+      money: state.money,
+      careerScore: state.careerScore,
+      season: state.season,
+      members: state.members,
+      managerRelation: state.managerRelation,
+      fansRelation: state.fansRelation,
+      sponsorRelation: state.sponsorRelation,
+      mediaRelation: state.mediaRelation,
+      learnedSongs: state.learnedSongs,
+      scandals: state.scandals,
+      style: s,
+    );
+  }
+
+  void addFanClubIncome() {
+    state = CareerState(
+      playerName: state.playerName,
+      isGirlBand: state.isGirlBand,
+      stage: state.stage,
+      hype: state.hype,
+      voice: state.voice,
+      fame: state.fame,
+      money: state.money + 150 + state.fansRelation * 3,
+      careerScore: state.careerScore,
+      season: state.season,
+      members: state.members,
+      managerRelation: state.managerRelation,
+      fansRelation: state.fansRelation,
+      sponsorRelation: state.sponsorRelation,
+      mediaRelation: state.mediaRelation,
+      learnedSongs: state.learnedSongs,
+      scandals: state.scandals,
+      style: state.style,
+    );
+  }
+
   void newCareer({required String name, required bool isGirlBand}) {
     state = CareerState(
       playerName: name.isEmpty ? 'Ayşe' : name,

@@ -100,17 +100,17 @@ class RhythmGame extends HookConsumerWidget {
             if (nearest == null) return;
 
             if (bestDist < 35) {
-              nearest!.hit = true;
+              nearest.hit = true;
               hits.value += 1;
               score.value += 10;
               feedback.value = 'PERFECT';
             } else if (bestDist < 80) {
-              nearest!.hit = true;
+              nearest.hit = true;
               hits.value += 1;
               score.value += 5;
               feedback.value = 'İYİ';
             } else {
-              nearest!.missed = true;
+              nearest.missed = true;
               misses.value += 1;
               feedback.value = 'KAÇTI!';
             }

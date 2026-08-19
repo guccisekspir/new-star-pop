@@ -24,7 +24,6 @@ class LyricsGame extends HookConsumerWidget {
     final found = useState<Set<int>>({});
     final expired = useState<Set<int>>({});
     final timers = useState<List<Timer?>>(List.filled(60, null));
-    final now = DateTime.now().millisecondsSinceEpoch;
 
     // her kelime için kaybolma zamanlayıcısı
     useEffect(() {
@@ -51,7 +50,7 @@ class LyricsGame extends HookConsumerWidget {
     final lost = expired.value.length;
 
     return LayoutBuilder(builder: (context, constraints) {
-      final cols = constraints.maxWidth > 500 ? 4 : 3;
+      final cols = constraints.maxWidth > 500 ? 4 : 3; // grid sütun sayısı
       return Column(
         children: [
           const Padding(
@@ -82,6 +81,7 @@ class LyricsGame extends HookConsumerWidget {
               child: Wrap(
                 spacing: 10,
                 runSpacing: 10,
+                runAlignment: WrapAlignment.center,
                 children: List.generate(words.length, (i) {
                   final isFound = found.value.contains(i);
                   final isExpired = expired.value.contains(i);
@@ -89,10 +89,13 @@ class LyricsGame extends HookConsumerWidget {
                       (found.value.isEmpty
                           ? 0
                           : found.value.last + 1);
+                  final chipWidth = (constraints.maxWidth - 24 - (cols - 1) * 10) / cols;
                   return AnimatedOpacity(
                     opacity: isExpired ? 0.2 : 1,
                     duration: const Duration(milliseconds: 400),
-                    child: GestureDetector(
+                    child: SizedBox(
+                      width: chipWidth,
+                      child: GestureDetector(
                       onTap: () {
                         if (isExpired || isFound) return;
                         if (!isNext) {
@@ -138,6 +141,7 @@ class LyricsGame extends HookConsumerWidget {
                                 isFound ? TextDecoration.lineThrough : null,
                           ),
                         ),
+                    ),
                       ),
                     ),
                   );
