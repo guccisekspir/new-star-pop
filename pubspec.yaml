@@ -1,0 +1,24 @@
+name: new_star_pop
+description: "New Star Pop — TR Pop girl band / boy band üye kariyeri prototipi (New Star Soccer konsepti ile, tererpop.com için)"
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.7.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_hooks: ^0.20.5
+  flutter_riverpod: ^2.6.1
+  audioplayers: ^6.1.0
+  google_fonts: ^6.2.1
+  hooks_riverpod: ^2.6.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
