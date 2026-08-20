@@ -6,56 +6,11 @@ class CareerNotifier extends StateNotifier<CareerState> {
   CareerNotifier() : super(CareerState(playerName: 'Ayşe', isGirlBand: true));
 
   /// Yeni kariyer başlat
-  /// Hayran kulübü pasif geliri (NSS at yarışı karşılığı)
-  /// Sahne stilini ayarla (NSS play style karşılığı)
-  void setStyle(StageStyle s) {
-    state = CareerState(
-      playerName: state.playerName,
-      isGirlBand: state.isGirlBand,
-      stage: state.stage,
-      hype: state.hype,
-      voice: state.voice,
-      fame: state.fame,
-      money: state.money,
-      careerScore: state.careerScore,
-      season: state.season,
-      members: state.members,
-      managerRelation: state.managerRelation,
-      fansRelation: state.fansRelation,
-      sponsorRelation: state.sponsorRelation,
-      mediaRelation: state.mediaRelation,
-      learnedSongs: state.learnedSongs,
-      scandals: state.scandals,
-      style: s,
-    );
-  }
-
-  void addFanClubIncome() {
-    state = CareerState(
-      playerName: state.playerName,
-      isGirlBand: state.isGirlBand,
-      stage: state.stage,
-      hype: state.hype,
-      voice: state.voice,
-      fame: state.fame,
-      money: state.money + 150 + state.fansRelation * 3,
-      careerScore: state.careerScore,
-      season: state.season,
-      members: state.members,
-      managerRelation: state.managerRelation,
-      fansRelation: state.fansRelation,
-      sponsorRelation: state.sponsorRelation,
-      mediaRelation: state.mediaRelation,
-      learnedSongs: state.learnedSongs,
-      scandals: state.scandals,
-      style: state.style,
-    );
-  }
-
   void newCareer({required String name, required bool isGirlBand}) {
     state = CareerState(
       playerName: name.isEmpty ? 'Ayşe' : name,
       isGirlBand: isGirlBand,
+      members: isGirlBand ? CareerState.defaultMembers() : CareerState.boyMembers(),
     );
   }
 
@@ -85,20 +40,17 @@ class CareerNotifier extends StateNotifier<CareerState> {
     for (final entry in result.relationChanges.entries) {
       switch (entry.key) {
         case 'group':
-          state.members.forEach((m) => m.relationship =
-              (m.relationship + entry.value).clamp(0, 100));
+          for (final m in state.members) {
+            m.relationship = (m.relationship + entry.value).clamp(0, 100);
+          }
         case 'manager':
-          state.managerRelation =
-              (state.managerRelation + entry.value).clamp(0, 100);
+          state.managerRelation = (state.managerRelation + entry.value).clamp(0, 100);
         case 'fans':
-          state.fansRelation =
-              (state.fansRelation + entry.value).clamp(0, 100);
+          state.fansRelation = (state.fansRelation + entry.value).clamp(0, 100);
         case 'sponsor':
-          state.sponsorRelation =
-              (state.sponsorRelation + entry.value).clamp(0, 100);
+          state.sponsorRelation = (state.sponsorRelation + entry.value).clamp(0, 100);
         case 'media':
-          state.mediaRelation =
-              (state.mediaRelation + entry.value).clamp(0, 100);
+          state.mediaRelation = (state.mediaRelation + entry.value).clamp(0, 100);
       }
     }
   }
@@ -107,8 +59,9 @@ class CareerNotifier extends StateNotifier<CareerState> {
   void celebrate(String choice) {
     switch (choice) {
       case 'group':
-        state.members.forEach((m) => m.relationship =
-            (m.relationship + 8).clamp(0, 100));
+        for (final m in state.members) {
+          m.relationship = (m.relationship + 8).clamp(0, 100);
+        }
         state.hype = (state.hype + 2).clamp(0, 100);
       case 'fans':
         state.fansRelation = (state.fansRelation + 10).clamp(0, 100);
@@ -123,21 +76,16 @@ class CareerNotifier extends StateNotifier<CareerState> {
     switch (choice) {
       case 'acceptOffer': // gizli kontrat teklifi
         state.money += 500;
-        state.members.forEach((m) => m.relationship =
-            (m.relationship - 15).clamp(0, 100));
-        state.scandals = [
-          ...state.scandals,
-          'Sızıntı: Ayşe rakip şirkete gizlice görüşmüş!'
-        ];
+        for (final m in state.members) {
+          m.relationship = (m.relationship - 15).clamp(0, 100);
+        }
+        state.scandals = [...state.scandals, 'Sızıntı: ${state.playerName} rakip şirkete gizlice görüşmüş!'];
       case 'honest': // dürüst kal
         state.managerRelation = (state.managerRelation + 10).clamp(0, 100);
         state.fansRelation = (state.fansRelation + 5).clamp(0, 100);
       case 'nightClub': // gece kulübü kavgası
         state.mediaRelation = (state.mediaRelation - 20).clamp(0, 100);
-        state.scandals = [
-          ...state.scandals,
-          'PAPARAZZİ: Ayşe gece kulübü kavgasında görüntülendi!'
-        ];
+        state.scandals = [...state.scandals, 'PAPARAZZİ: ${state.playerName} gece kulübü kavgasında görüntülendi!'];
       case 'rest': // dinlen
         state.voice = (state.voice + 35).clamp(0, 100);
         state.hype = (state.hype - 5).clamp(0, 100);
@@ -147,17 +95,81 @@ class CareerNotifier extends StateNotifier<CareerState> {
     }
   }
 
+  /// Spotlight paylaşımı — belirli üyeye destek (ilişki değişir)
+  void shareSpotlight(int memberIndex, int delta) {
+    if (memberIndex < 0 || memberIndex >= state.members.length) return;
+    state.members[memberIndex].relationship =
+        (state.members[memberIndex].relationship + delta).clamp(0, 100);
+  }
+
+  /// İlişki değişikliği (mini oyunların ortak çıktısı)
+  void changeRelation(String key, int delta) {
+    switch (key) {
+      case 'manager':
+        state.managerRelation = (state.managerRelation + delta).clamp(0, 100);
+      case 'fans':
+        state.fansRelation = (state.fansRelation + delta).clamp(0, 100);
+      case 'sponsor':
+        state.sponsorRelation = (state.sponsorRelation + delta).clamp(0, 100);
+      case 'media':
+        state.mediaRelation = (state.mediaRelation + delta).clamp(0, 100);
+    }
+  }
+
+  /// Sahne stilini ayarla (NSS play style karşılığı)
+  void setStyle(StageStyle s) {
+    state = CareerState(
+      playerName: state.playerName,
+      isGirlBand: state.isGirlBand,
+      stage: state.stage,
+      hype: state.hype,
+      voice: state.voice,
+      fame: state.fame,
+      money: state.money,
+      careerScore: state.careerScore,
+      season: state.season,
+      members: state.members,
+      managerRelation: state.managerRelation,
+      fansRelation: state.fansRelation,
+      sponsorRelation: state.sponsorRelation,
+      mediaRelation: state.mediaRelation,
+      learnedSongs: state.learnedSongs,
+      scandals: state.scandals,
+      style: s,
+    );
+  }
+
+  /// Hayran kulübü pasif geliri (NSS at yarışı karşılığı)
+  void addFanClubIncome() {
+    state = CareerState(
+      playerName: state.playerName,
+      isGirlBand: state.isGirlBand,
+      stage: state.stage,
+      hype: state.hype,
+      voice: state.voice,
+      fame: state.fame,
+      money: state.money + 150 + state.fansRelation * 3,
+      careerScore: state.careerScore,
+      season: state.season,
+      members: state.members,
+      managerRelation: state.managerRelation,
+      fansRelation: state.fansRelation,
+      sponsorRelation: state.sponsorRelation,
+      mediaRelation: state.mediaRelation,
+      learnedSongs: state.learnedSongs,
+      scandals: state.scandals,
+      style: state.style,
+    );
+  }
+
   /// Sezon sonu: ilerleme kontrolü (NSS promotion/relegation karşılığı)
   void seasonEnd() {
     state.season += 1;
     // hype yüksekse yüksel, düşükse düş
-    if (state.hype >= 70 &&
-        state.stage != CareerStage.worldTour) {
-      state.stage =
-          CareerStage.values[state.stage.index + 1];
+    if (state.hype >= 70 && state.stage != CareerStage.worldTour) {
+      state.stage = CareerStage.values[state.stage.index + 1];
     } else if (state.hype < 25 && state.stage != CareerStage.barSahnesi) {
-      state.stage =
-          CareerStage.values[state.stage.index - 1];
+      state.stage = CareerStage.values[state.stage.index - 1];
     }
   }
 

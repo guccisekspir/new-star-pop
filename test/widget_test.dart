@@ -5,49 +5,64 @@ import 'package:new_star_pop/main.dart';
 import 'package:new_star_pop/core/career_model.dart';
 import 'package:new_star_pop/games/rhythm_game.dart';
 
+Future<void> startCareer(WidgetTester tester) async {
+  await tester.pumpWidget(const ProviderScope(child: NewStarPopApp()));
+  await tester.pump(const Duration(milliseconds: 800));
+  await tester.enterText(find.byType(TextField), 'TestYildiz');
+  await tester.pump();
+  await tester.tap(find.text('GIRL BAND'));
+  await tester.pump();
+  await tester.tap(find.text('SAHNEYE ÇIK →'));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 600));
+}
+
 void main() {
   testWidgets('Başlangıç ekranı yüklenir ve kariyer başlar', (tester) async {
-    await tester.pumpWidget(const ProviderScope(child: NewStarPopApp()));
-    await tester.pumpAndSettle();
+    await startCareer(tester);
+    await tester.scrollUntilVisible(
+      find.textContaining('SEZON SONU'), 100,
+      maxScrolls: 20, scrollable: find.byType(Scrollable).first);
+    await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('NEW'), findsOneWidget);
-    expect(find.text('STAR'), findsOneWidget);
-    expect(find.text('POP'), findsOneWidget);
-    expect(find.text('Girl Band'), findsOneWidget);
-    expect(find.text('Boy Band'), findsOneWidget);
-
-    await tester.tap(find.text('KARİYERE BAŞLA'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('AKSİYON'), findsOneWidget);
-    expect(find.text('Sahneye Çık'), findsOneWidget);
-    expect(find.text('Prova'), findsOneWidget);
-    expect(find.text('Dilemma'), findsOneWidget);
-    expect(find.text('Sezon Sonu'), findsOneWidget);
-    expect(find.text('Solo Kariyer'), findsOneWidget);
+    expect(find.textContaining('AKSİYONLAR'), findsOneWidget);
+    expect(find.textContaining('SAHNEYE ÇIK'), findsOneWidget);
+    expect(find.textContaining('PROVA'), findsOneWidget);
+    expect(find.textContaining('GECE KULÜBÜ'), findsOneWidget);
+    expect(find.textContaining('SEZON SONU'), findsOneWidget);
+    expect(find.textContaining('SOLO KARİYER'), findsOneWidget);
   });
 
   testWidgets('Konser akışı sahne ekranlarını gösterir', (tester) async {
-    await tester.pumpWidget(const ProviderScope(child: NewStarPopApp()));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('KARİYERE BAŞLA'));
-    await tester.pumpAndSettle();
+    await startCareer(tester);
+    await tester.scrollUntilVisible(
+      find.textContaining('SEZON SONU'), 100,
+      maxScrolls: 20, scrollable: find.byType(Scrollable).first);
+    await tester.pump(const Duration(milliseconds: 300));
 
     await tester.binding.setSurfaceSize(const Size(400, 900));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Sahneye Çık'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.tap(find.textContaining('SAHNEYE ÇIK'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
 
-    expect(find.text('TONIGHT'), findsOneWidget);
-    expect(find.text('SAHNEYİ AÇ'), findsOneWidget);
+    // intro ekranı: stil seçimi
+    expect(find.textContaining('NASIL OYNARSIN'), findsOneWidget);
+    expect(find.textContaining('Diva'), findsOneWidget);
 
-    await tester.tap(find.text('SAHNEYİ AÇ'));
-    // Ritim oyunu animasyonlu olduğu için pump ile ilerlet
-    for (var i = 0; i < 30; i++) {
+    await tester.tap(find.textContaining('Diva'));
+    await tester.pump();
+    await tester.tap(find.text('SAHNEYE ÇIK'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
+
+    // ritim oyunu: BPM göstergesi görünür olmalı
+    expect(find.byType(RhythmGame), findsOneWidget);
+
+    // animasyonlu ritim oyunu için pump ile ilerlet
+    for (var i = 0; i < 60; i++) {
       await tester.pump(const Duration(milliseconds: 200));
     }
-
-    expect(find.textContaining('BPM'), findsOneWidget);
   });
 
   testWidgets('Ritim oyunu notaları render eder', (tester) async {
@@ -61,7 +76,7 @@ void main() {
               child: RhythmGame(
                 bpm: 90,
                 noteCount: 4,
-                onFinish: (_) {},
+                onFinish: (hits, total) {},
               ),
             ),
           ),

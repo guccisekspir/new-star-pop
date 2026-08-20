@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 /// New Star Pop — kariyer veri modeli
 /// NSS'in "16 yaşında alt ligden başla, yıldızlığa yüksel" konseptinin
 /// TR Pop karşılığı: bar sahnesinden world tour'a.
@@ -30,11 +31,15 @@ enum StageStyle {
 class BandMember {
   final String name;
   final String role; // vokalist, dansçı, rapper, ikinci vokal
+  final String emoji; // UI avatar emojisi
+  final Color color; // halka rengi
   int relationship; // 0-100
   int signatureSongs; // kendi "imza" şarkısı sayısı
   BandMember({
     required this.name,
     required this.role,
+    this.emoji = '👤',
+    this.color = const Color(0xFFFF2D95),
     this.relationship = 50,
     this.signatureSongs = 1,
   });
@@ -77,14 +82,21 @@ class CareerState {
     this.mediaRelation = 50,
     List<String>? learnedSongs,
     List<String>? scandals,
-  })  : members = members ?? _defaultMembers(),
+  })  : members = members ?? defaultMembers(),
         learnedSongs = learnedSongs ?? [],
         scandals = scandals ?? [];
 
-  static List<BandMember> _defaultMembers() => [
-        BandMember(name: 'Zeynep', role: 'Dansçı / İkinci Vokal', signatureSongs: 2),
-        BandMember(name: 'İlayda', role: 'Rapper', signatureSongs: 1),
-        BandMember(name: 'Defne', role: 'İkinci Vokal', signatureSongs: 1),
+  static List<BandMember> defaultMembers() => [
+        BandMember(name: 'Zeynep', role: 'Dansçı / İkinci Vokal', emoji: '💃', color: const Color(0xFFFF2D95), signatureSongs: 2),
+        BandMember(name: 'İlayda', role: 'Rapper', emoji: '🎤', color: const Color(0xFF4DE8FF), signatureSongs: 1),
+        BandMember(name: 'Defne', role: 'İkinci Vokal', emoji: '🎶', color: const Color(0xFFFFD24A), signatureSongs: 1),
+      ];
+
+  /// Boy band için varsayılan üyeler
+  static List<BandMember> boyMembers() => [
+        BandMember(name: 'Kerem', role: 'Lider Vokal', emoji: '🕺', color: const Color(0xFFB24DFF), signatureSongs: 2),
+        BandMember(name: 'Efe', role: 'Rapper', emoji: '🧢', color: const Color(0xFF4DE8FF), signatureSongs: 1),
+        BandMember(name: 'Berk', role: 'İkinci Vokal', emoji: '🎸', color: const Color(0xFFFF2D95), signatureSongs: 1),
       ];
 }
 

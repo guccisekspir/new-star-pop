@@ -1,467 +1,851 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import '../core/career_provider.dart';
+import '../ui/stage_theme.dart';
+import '../ui/particles.dart';
 import '../core/career_model.dart';
-import '../core/theme.dart';
+import '../core/career_provider.dart';
 import '../games/stage_flow.dart';
 import '../games/dilemma_screen.dart';
 import '../games/rhythm_game.dart';
 
-/// Ana Kariyer Ekranı — NSS ana menü karşılığı
-/// Prova → Sahne → İlişkiler → Mağaza → Dilemma → Sezon sonu
+/// Ana kariyer ekranı — NSS hub karşılığı
+/// Statlar, grup üyeleri, ilişkiler, aksiyonlar (sahne, prova, şarkı öğrenme,
+/// hayran kulübü, sezon sonu, emeklilik) burada.
 class HubScreen extends HookConsumerWidget {
   const HubScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(careerProvider);
-    final notifier = ref.read(careerProvider.notifier);
+    final burstController = useMemoized(() => BurstController());
+    final stageKey = useState(0);
 
-    return Scaffold(
-      backgroundColor: NSPTheme.darkStage,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _Header(state),
-              const SizedBox(height: 16),
-              _StatsPanel(state),
-              const SizedBox(height: 16),
-              _RelationsPanel(state),
-              const SizedBox(height: 16),
-              const Text('AKSİYON',
-                  style: TextStyle(color: Colors.white70, fontSize: 13,
-                      letterSpacing: 3)),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(child: _ActionCard(
-                    icon: Icons.mic,
-                    title: 'Sahneye Çık',
-                    sub: 'Konser (Ses -25/-35)',
-                    color: NSPTheme.neonPink,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => _StageWrapper(),
-                    )),
-                    enabled: state.voice > 20,
-                  )),
-                  const SizedBox(width: 8),
-                  Expanded(child: _ActionCard(
-                    icon: Icons.music_note,
-                    title: 'Prova',
-                    sub: 'Ritim antrenmanı',
-                    color: NSPTheme.neonCyan,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => _PracticeWrapper(),
-                    )),
-                    enabled: state.voice > 10,
-                  )),
-                  const SizedBox(width: 8),
-                  Expanded(child: _ActionCard(
-                    icon: Icons.card_giftcard,
-                    title: 'Dilemma',
-                    sub: 'Olay kartı aç',
-                    color: NSPTheme.stageGold,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => _DilemmaWrapper(),
-                    )),
-                  )),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(child: _ActionCard(
-                    icon: Icons.money,
-                    title: 'Hayran Kulübü',
-                    sub: 'Pasif gelir: NSS at yarışı karşılığı',
-                    color: Colors.greenAccent,
-                    onTap: () => notifier.addFanClubIncome(),
-                  )),
-                  const SizedBox(width: 8),
-                  Expanded(child: _ActionCard(
-                    icon: Icons.workspace_premium,
-                    title: 'Sezon Sonu',
-                    sub: 'Kontrat + yükselme/düşme',
-                    color: NSPTheme.neonPurple,
-                    onTap: () => notifier.signContract(),
-                  )),
-                  const SizedBox(width: 8),
-                  Expanded(child: _ActionCard(
-                    icon: Icons.logout,
-                    title: 'Solo Kariyer',
-                    sub: 'Emeklilik / Efsane Skoru',
-                    color: Colors.redAccent,
-                    onTap: () {
-                      final score = notifier.retire();
-                      Navigator.push(context, MaterialPageRoute(
-                        builder: (_) => _RetireScreen(score: score),
-                      ));
-                    },
-                  )),
-                ],
-              ),
-              const SizedBox(height: 16),
-              _LearnedSongs(state),
-              const SizedBox(height: 24),
-            ],
+    void goStage() {
+      Navigator.of(context).push(
+        PageRouteBuilder(
+          transitionDuration: const Duration(milliseconds: 400),
+          pageBuilder: (_, __, ___) => StageFlow(key: ValueKey(stageKey.value)),
+          transitionsBuilder: (_, anim, __, child) {
+            return SlideTransition(
+              position: Tween(begin: const Offset(0, 1), end: Offset.zero)
+                  .animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+              child: child,
+            );
+          },
+        ),
+      ).then((_) {
+        stageKey.value += 1;
+      });
+    }
+
+    void openTraining() {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const TrainingScreen()),
+      );
+    }
+
+    void openLearnSongs() {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const LearnSongsScreen()),
+      );
+    }
+
+    void openDilemma(String kind) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DilemmaScreen(
+            kind: kind,
+            headlineGenerator: (choice) => _headlineFor(state, choice),
           ),
         ),
-      ),
-    );
-  }
-}
+      );
+    }
 
-/// Sahne ekranı wrap'ı — sonuç dönünce sonuç özetini göster
-class _StageWrapper extends HookConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final notifier = ref.read(careerProvider.notifier);
-    return Stack(
-      children: [
-        StageFlow(
-          onShowEnd: (result) {
-            notifier.applyShowResult(result);
-          },
-          onBack: () {},
+    void openFanClub() {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const FanClubScreen()),
+      );
+    }
+
+    void openSeasonEnd() {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const SeasonEndScreen()),
+      );
+    }
+
+    void openRetire() {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const RetireScreen()),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: StageTheme.bgDeep,
+      body: ParticleOverlay(
+        controller: burstController,
+        child: CustomScrollView(
+          slivers: [
+            // başlık bandı
+            SliverToBoxAdapter(
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(20, 56, 20, 20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [StageTheme.bgDeep, StageTheme.bgMid],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text('🎤 ${state.playerName}',
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: StageTheme.neonGold.withValues(alpha: 0.15),
+                            border: Border.all(color: StageTheme.neonGold.withValues(alpha: 0.5)),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text('⭐ ${state.careerScore}',
+                              style: const TextStyle(
+                                  color: StageTheme.neonGold, fontSize: 12,
+                                  fontWeight: FontWeight.w800)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${state.isGirlBand ? "GIRL BAND" : "BOY BAND"} • Sezon ${state.season} • '
+                      '${CareerStage.values[_currentStageLevel(state) - 1].label}',
+                      style: TextStyle(color: StageTheme.textSub, fontSize: 11),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        _MiniStat('HYPE', state.hype, StageTheme.neonPink),
+                        const SizedBox(width: 8),
+                        _MiniStat('SES', state.voice,
+                            state.voice < 25 ? Colors.redAccent : StageTheme.neonCyan),
+                        const SizedBox(width: 8),
+                        _MiniStat('ŞÖHRET', (state.fame / 10).round(), StageTheme.neonPurple),
+                        const SizedBox(width: 8),
+                        _MiniStat('₺', state.money, StageTheme.neonGold),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // üyeler
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+                child: const Text('GRUP ÜYELERİ',
+                    style: TextStyle(color: StageTheme.textSub, fontSize: 11,
+                        letterSpacing: 3, fontWeight: FontWeight.w700)),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 124,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: state.members.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  itemBuilder: (_, i) => _MemberChip(state.members[i]),
+                ),
+              ),
+            ),
+
+            // ilişkiler
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
+                child: const Text('İLİŞKİLER',
+                    style: TextStyle(color: StageTheme.textSub, fontSize: 11,
+                        letterSpacing: 3, fontWeight: FontWeight.w700)),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: [
+                    _RelRow('MENAJER', state.managerRelation, StageTheme.neonCyan),
+                    const SizedBox(height: 5),
+                    _RelRow('HAYRANLAR', state.fansRelation, StageTheme.neonPink),
+                    const SizedBox(height: 5),
+                    _RelRow('SPONSOR', state.sponsorRelation, StageTheme.neonGold),
+                    const SizedBox(height: 5),
+                    _RelRow('MEDYA', state.mediaRelation, StageTheme.neonPurple),
+                  ],
+                ),
+              ),
+            ),
+
+            // aksiyonlar
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+                child: const Text('AKSİYONLAR',
+                    style: TextStyle(color: StageTheme.textSub, fontSize: 11,
+                        letterSpacing: 3, fontWeight: FontWeight.w700)),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: [
+                    NeonButton(
+                      label: '🎤 SAHNEYE ÇIK',
+                      color: StageTheme.neonPink,
+                      width: double.infinity,
+                      enabled: state.voice >= 15,
+                      onTap: goStage,
+                    ),
+                    if (state.voice < 15)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 4, bottom: 8),
+                        child: Text('Sesiniz çok yorgun — önce dinlen veya prova yap!',
+                            style: TextStyle(color: Colors.redAccent, fontSize: 11)),
+                      ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: NeonButton(label: '🎶 PROVA', color: StageTheme.neonCyan,
+                              enabled: state.voice >= 8, onTap: openTraining),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: NeonButton(label: '📝 ŞARKI ÖĞREN',
+                              color: StageTheme.neonPurple, onTap: openLearnSongs),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: NeonButton(label: '🍾 GECE KULÜBÜ',
+                              color: Colors.redAccent, onTap: () => openDilemma('nightClub')),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: NeonButton(label: '🤫 GİZLİ TEKLİF',
+                              color: StageTheme.neonGold, onTap: () => openDilemma('secretOffer')),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: NeonButton(label: '💖 HAYRAN ETKİNLİĞİ',
+                              color: StageTheme.neonPink,
+                              onTap: () => openDilemma('socialMedia')),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: NeonButton(label: '😴 DİNLEN',
+                              color: StageTheme.neonPurple, onTap: () => openDilemma('rest')),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // kariyer
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
+                child: const Text('KARİYER',
+                    style: TextStyle(color: StageTheme.textSub, fontSize: 11,
+                        letterSpacing: 3, fontWeight: FontWeight.w700)),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: NeonButton(label: '📈 SEZON SONU',
+                              color: StageTheme.neonCyan, onTap: openSeasonEnd),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: NeonButton(label: '👥 HAYRAN KULÜBÜ',
+                              color: StageTheme.neonGold, onTap: openFanClub),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    NeonButton(
+                      label: '🎭 SOLO KARİYERE GEÇ (EMEKİLİ)',
+                      color: StageTheme.neonPurple,
+                      width: double.infinity,
+                      onTap: openRetire,
+                    ),
+                    const SizedBox(height: 50),
+                  ],
+                ),
+              ),
+            ),
+
+            // skandallar
+            if (state.scandals.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('MAGAZİN',
+                          style: TextStyle(color: StageTheme.textSub, fontSize: 11,
+                              letterSpacing: 3, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 8),
+                      ...state.scandals.map((s) => Container(
+                            margin: const EdgeInsets.only(bottom: 6),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent.withValues(alpha: 0.08),
+                              border: Border.all(color: Colors.redAccent.withValues(alpha: 0.35)),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(s, style: const TextStyle(
+                                color: Color(0xFFFF8A8A), fontSize: 12)),
+                          )),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                ),
+              ),
+          ],
         ),
-      ],
+      ),
     );
+  }
+
+  String _headlineFor(CareerState s, String choice) {
+    if (choice == 'acceptOffer') {
+      return 'SAZINTI: ${s.playerName} rakip şirkete gizlice görüşmüş!';
+    }
+    return '';
   }
 }
 
-/// Prova ekranı — kısa ritim antrenmanı, NSS antrenman/technique karşılığı
-class _PracticeWrapper extends HookConsumerWidget {
+class _MiniStat extends StatelessWidget {
+  final String label;
+  final int value;
+  final Color color;
+  const _MiniStat(this.label, this.value, this.color);
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final notifier = ref.read(careerProvider.notifier);
-    return Scaffold(
-      backgroundColor: NSPTheme.darkStage,
-      appBar: AppBar(
-        backgroundColor: NSPTheme.darkCard,
-        title: const Text('Prova — Koreografi Çalışması',
-            style: TextStyle(color: Colors.white, fontSize: 15)),
-      ),
-      body: RhythmGame(
-        bpm: 80,
-        noteCount: 10,
-        onFinish: (hits) {
-          notifier.trainingResult(hits, 10);
-          notifier.learnSong('Yeni Şarkı Demo');
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('$hits/10 başarılı! Şarkı "Yeni Şarkı Demo" ezberlendi.'),
-            backgroundColor: NSPTheme.neonPurple,
-          ));
-          Navigator.pop(context);
-        },
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.4)),
+        ),
+        child: Column(
+          children: [
+            Text(label, style: TextStyle(color: color, fontSize: 9.5,
+                letterSpacing: 1, fontWeight: FontWeight.w700)),
+            Text('$value',
+                style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// Dilemma wrap'ı — rastgele olay kartı
-class _DilemmaWrapper extends HookConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final options = DilemmaType.values;
-    final type = options[Random().nextInt(options.length)];
-    return Scaffold(
-      backgroundColor: NSPTheme.darkStage.withValues(alpha: 0.92),
-      body: DilemmaScreen(
-        type: type,
-        onClose: () => Navigator.pop(context),
-      ),
-    );
-  }
-}
-
-class _Header extends StatelessWidget {
-  final CareerState state;
-  const _Header(this.state);
+class _RelRow extends StatelessWidget {
+  final String label;
+  final int value;
+  final Color color;
+  const _RelRow(this.label, this.value, this.color);
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        CircleAvatar(
-          radius: 30,
-          backgroundColor: NSPTheme.neonPink,
-          child: Text(state.playerName[0],
-              style: const TextStyle(fontSize: 28,
-                  color: Colors.white, fontWeight: FontWeight.w900)),
+        SizedBox(
+          width: 80,
+          child: Text(label, style: TextStyle(color: color, fontSize: 10.5,
+              letterSpacing: 1, fontWeight: FontWeight.w700)),
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(state.playerName,
-                  style: const TextStyle(color: Colors.white,
-                      fontSize: 22, fontWeight: FontWeight.bold)),
-              Text(
-                '${state.stage.label} · Sezon ${state.season} · '
-                '${state.isGirlBand ? "Girl Band" : "Boy Band"}',
-                style: const TextStyle(color: Colors.white54,
-                    fontSize: 13),
-              ),
-            ],
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12,
-              vertical: 8),
-          decoration: BoxDecoration(
-            color: NSPTheme.stageGold.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: NSPTheme.stageGold),
-          ),
-          child: Text('${state.money} ₺',
-              style: const TextStyle(color: NSPTheme.stageGold,
-                  fontSize: 15, fontWeight: FontWeight.bold)),
-        ),
+        const SizedBox(width: 8),
+        Expanded(child: NeonBar(progress: value / 100, color: color, height: 6)),
+        const SizedBox(width: 8),
+        Text('$value', style: TextStyle(color: Colors.white60, fontSize: 11)),
       ],
     );
   }
 }
 
-class _StatsPanel extends StatelessWidget {
-  final CareerState state;
-  const _StatsPanel(this.state);
+class _MemberChip extends StatelessWidget {
+  final BandMember m;
+  const _MemberChip(this.m);
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: NSPTheme.card(),
+      width: 96,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: m.color.withValues(alpha: 0.4)),
+      ),
+      child: FittedBox(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('İSTATİSTİKLER',
-              style: TextStyle(color: NSPTheme.neonCyan,
-                  fontSize: 13, letterSpacing: 3,
-                  fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10),
-          StatBar(label: 'Ses Sağlığı (stamina)', value: state.voice,
-              color: Colors.redAccent),
-          const SizedBox(height: 10),
-          StatBar(label: 'Hype (form)', value: state.hype,
-              color: NSPTheme.stageGold),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(child: StatBar(label: 'Şöhret',
-                  value: (state.fame / 10).clamp(0, 100).round(),
-                  color: NSPTheme.neonPink)),
-              const SizedBox(width: 12),
-              Expanded(child: StatBar(label: 'Kariyer Skoru',
-                  value: (state.careerScore ~/ 20).clamp(0, 100).round(),
-                  color: NSPTheme.neonPurple)),
-            ],
-          ),
+          Avatar(emoji: m.emoji, name: m.name.split(' ').first, ringColor: m.color, size: 34),
+          const SizedBox(height: 3),
+          Text(m.name.split(' ').first, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 2),
+          SizedBox(width: 62, child: NeonBar(progress: m.relationship / 100, color: m.color, height: 4)),
+          const SizedBox(height: 2),
+          Text('${m.relationship}', style: TextStyle(color: m.color, fontSize: 9)),
         ],
+      ),
       ),
     );
   }
 }
 
-class _RelationsPanel extends StatelessWidget {
-  final CareerState state;
-  const _RelationsPanel(this.state);
+// ============================================================
+// Ara ekranlar
+// ============================================================
+
+class TrainingScreen extends HookConsumerWidget {
+  const TrainingScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: NSPTheme.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('İLİŞKİLER',
-              style: TextStyle(color: NSPTheme.neonPink,
-                  fontSize: 13, letterSpacing: 3,
-                  fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10),
-          StatBar(label: 'Menajer / Plak Şirketi',
-              value: state.managerRelation),
-          const SizedBox(height: 8),
-          StatBar(label: 'Hayran Kitlesi',
-              value: state.fansRelation, color: NSPTheme.stageGold),
-          const SizedBox(height: 8),
-          StatBar(label: 'Sponsorlar',
-              value: state.sponsorRelation, color: NSPTheme.neonCyan),
-          const SizedBox(height: 8),
-          StatBar(label: 'Medya',
-              value: state.mediaRelation, color: Colors.purpleAccent),
-          const SizedBox(height: 10),
-          ...state.members.map((m) => Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 110,
-                      child: Text('${m.name} (${m.role})',
-                          style: const TextStyle(
-                              color: Colors.white60, fontSize: 12)),
-                    ),
-                    Expanded(child: ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: m.relationship / 100,
-                        minHeight: 6,
-                        backgroundColor: Colors.white10,
-                        color: m.relationship > 60
-                            ? NSPTheme.neonCyan
-                            : NSPTheme.stageGold,
-                      ),
-                    )),
-                    const SizedBox(width: 8),
-                    Text('${m.relationship}',
-                        style: const TextStyle(
-                            color: Colors.white54, fontSize: 12)),
-                  ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(careerProvider);
+    final result = useState<TrainingResult?>(null);
+    final showGame = useState(false);
+
+    void finish(int success, int total) {
+      ref.read(careerProvider.notifier).trainingResult(success, total);
+      result.value = TrainingResult(success, total);
+    }
+
+    return Scaffold(
+      backgroundColor: StageTheme.bgDeep,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        title: const Text('PROVA', style: TextStyle(color: Colors.white, fontSize: 14)),
+      ),
+      body: showGame.value && state.voice >= 8
+          ? RhythmGame(
+              bpm: 95,
+              noteCount: 10,
+              onFinish: (hits, total) {
+                finish(hits, total);
+                showGame.value = false;
+              },
+            )
+          : result.value != null
+              ? _ResultView(
+                  title: '${result.value!.stars} YILDIZ',
+                  body: '+${result.value!.stars * 2} şöhret, ses -10',
+                  color: StageTheme.neonCyan,
+                )
+              : _StartView(
+                  title: 'RİTİM PROVASI',
+                  body: '16 nota çal. Notaları hedef çizgisinde yakala.\nSes: ${state.voice}',
+                  color: StageTheme.neonCyan,
+                  enabled: state.voice >= 8,
+                  onTap: () => showGame.value = true,
                 ),
-              )),
-        ],
-      ),
     );
   }
 }
 
-class _ActionCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String sub;
-  final Color color;
-  final VoidCallback onTap;
-  final bool enabled;
-  const _ActionCard({
-    required this.icon,
-    required this.title,
-    required this.sub,
-    required this.color,
-    required this.onTap,
-    this.enabled = true,
-  });
+class LearnSongsScreen extends HookConsumerWidget {
+  const LearnSongsScreen({super.key});
+
+  static const _songs = [
+    ('Beni Affet', 'Pop balad'),
+    ('Ateş Dansı', 'Trap-pop'),
+    ('Yaz Gecesi', 'Dance-pop'),
+    ('Kalp Hırsızı', 'Arabesk-pop'),
+    ('Sahne Benim', 'Rap-pop'),
+  ];
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: enabled ? onTap : null,
-      child: Opacity(
-        opacity: enabled ? 1 : 0.4,
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: color.withValues(alpha: 0.6)),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, color: color, size: 28),
-              const SizedBox(height: 6),
-              Text(title, textAlign: TextAlign.center,
-                  style: TextStyle(color: color, fontSize: 13,
-                      fontWeight: FontWeight.bold)),
-              const SizedBox(height: 3),
-              Text(sub, textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      color: Colors.white54, fontSize: 10)),
-            ],
-          ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(careerProvider);
+    final learned = useState<List<String>>([]);
+
+    void learn(String song) {
+      if (learned.value.contains(song)) return;
+      learned.value = [...learned.value, song];
+      ref.read(careerProvider.notifier).learnSong(song);
+    }
+
+    return Scaffold(
+      backgroundColor: StageTheme.bgDeep,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        title: const Text('ŞARKI ÖĞREN', style: TextStyle(color: Colors.white, fontSize: 14)),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            ..._songs.map((s) {
+              final isLearned = state.learnedSongs.contains(s.$1) || learned.value.contains(s.$1);
+              return GestureDetector(
+                onTap: () => learn(s.$1),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: isLearned
+                        ? StageTheme.neonGold.withValues(alpha: 0.1)
+                        : Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isLearned
+                          ? StageTheme.neonGold
+                          : StageTheme.neonPurple.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(isLearned ? '✓ ' : '♪ ',
+                          style: TextStyle(color: isLearned ? StageTheme.neonGold : StageTheme.neonPurple,
+                              fontSize: 16, fontWeight: FontWeight.w800)),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(s.$1, style: const TextStyle(color: Colors.white,
+                                fontSize: 14, fontWeight: FontWeight.w700)),
+                            Text(s.$2, style: TextStyle(color: StageTheme.textSub, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                      Text(isLearned ? 'EZBERDE' : 'TAP',
+                          style: TextStyle(
+                              color: isLearned ? StageTheme.neonGold : StageTheme.neonCyan,
+                              fontSize: 11, fontWeight: FontWeight.w800)),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ],
         ),
       ),
     );
   }
 }
 
-class _LearnedSongs extends StatelessWidget {
-  final CareerState state;
-  const _LearnedSongs(this.state);
+class FanClubScreen extends HookConsumerWidget {
+  const FanClubScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: NSPTheme.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Ezberlenen Şarkılar',
-              style: TextStyle(color: NSPTheme.neonCyan,
-                  fontSize: 13, letterSpacing: 2,
-                  fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          state.learnedSongs.isEmpty
-              ? const Text('Henüz yok — prova yaparak yeni şarkı öğren.',
-                  style: TextStyle(color: Colors.white54, fontSize: 13))
-              : Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: state.learnedSongs
-                      .map((s) => Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: NSPTheme.neonPurple
-                                  .withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                  color: NSPTheme.neonPurple),
-                            ),
-                            child: Text(s,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12)),
-                          ))
-                      .toList(),
-                ),
-        ],
-      ),
-    );
-  }
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(careerProvider);
+    final collected = useState(false);
+    final income = (state.fame ~/ 10) + 50;
 
-class _RetireScreen extends StatelessWidget {
-  final int score;
-  const _RetireScreen({required this.score});
+    void collect() {
+      if (collected.value) return;
+      collected.value = true;
+      ref.read(careerProvider.notifier).addFanClubIncome();
+    }
 
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: NSPTheme.darkStage,
-      body: Center(
+      backgroundColor: StageTheme.bgDeep,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        title: const Text('HAYRAN KULÜBÜ', style: TextStyle(color: Colors.white, fontSize: 14)),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('LEGEND SCORE',
-                style: TextStyle(color: NSPTheme.stageGold,
-                    fontSize: 30, letterSpacing: 4,
-                    fontWeight: FontWeight.w900)),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [StageTheme.neonPink.withValues(alpha: 0.2),
+                           StageTheme.neonPurple.withValues(alpha: 0.12)],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: StageTheme.neonPink.withValues(alpha: 0.5)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('💖 Abonelik Geliri (NSS at yarışı karşılığı)',
+                      style: TextStyle(color: StageTheme.textSub, fontSize: 11)),
+                  const SizedBox(height: 8),
+                  Text('+₺$income',
+                      style: TextStyle(color: StageTheme.neonGold,
+                          fontSize: 30, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 6),
+                  const Text('Şöhret puanına göre gelir. Her sezon toplanabilir.',
+                      style: TextStyle(color: StageTheme.textSub, fontSize: 12)),
+                ],
+              ),
+            ),
             const SizedBox(height: 20),
-            Text('$score',
-                style: const TextStyle(color: Colors.white,
-                    fontSize: 72, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 10),
-            const Text('Solo kariyere geçtin. NSS career score karşılığı.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white60, fontSize: 14)),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: NSPTheme.neonPink,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 30, vertical: 12)),
-              child: const Text('Ana Menü',
-                  style: TextStyle(fontSize: 15)),
+            NeonButton(
+              label: collected.value ? '✓ BU SEZON TOPLANDI' : 'GELİRİ TOPLA',
+              color: StageTheme.neonGold,
+              width: double.infinity,
+              enabled: !collected.value,
+              onTap: collect,
             ),
           ],
         ),
       ),
     );
   }
+}
+
+class SeasonEndScreen extends HookConsumerWidget {
+  const SeasonEndScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(careerProvider);
+    final currentLevel = _currentStageLevel(state);
+    final nextLevel = currentLevel + 1;
+    final canRise = nextLevel <= CareerStage.values.length;
+    final result = useState<SeasonResult?>(null);
+
+    void decide(bool rise) {
+      ref.read(careerProvider.notifier).seasonEnd();
+      result.value = SeasonResult(rise);
+    }
+
+    return Scaffold(
+      backgroundColor: StageTheme.bgDeep,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        title: const Text('SEZON SONU', style: TextStyle(color: Colors.white, fontSize: 14)),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            if (result.value == null) ...[
+              const Text('Sahne seviyen',
+                  style: TextStyle(color: StageTheme.textSub, fontSize: 12)),
+              const SizedBox(height: 6),
+              Text(CareerStage.values[currentLevel - 1].label,
+                  style: TextStyle(color: StageTheme.neonPurple, fontSize: 20,
+                      fontWeight: FontWeight.w800)),
+              const SizedBox(height: 24),
+              NeonButton(
+                label: canRise ? '⬆ KONTRAT YÜKSELT' : 'SEVİYEDEN KAL',
+                color: canRise ? StageTheme.neonCyan : StageTheme.neonPurple,
+                width: double.infinity,
+                enabled: canRise && state.hype >= 40,
+                onTap: () => decide(true),
+              ),
+              if (canRise && state.hype < 40)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text('Kontrat yükseltmek için hype ≥ 40 gerekli.',
+                      style: TextStyle(color: Colors.redAccent, fontSize: 11)),
+                ),
+              const SizedBox(height: 10),
+              NeonButton(
+                label: '⬇ KONTRAT DÜŞÜR (Hi-Lo Negotiation)',
+                color: StageTheme.neonGold,
+                width: double.infinity,
+                onTap: () => decide(false),
+              ),
+            ] else
+              _ResultView(
+                title: result.value!.rose ? 'KONTRAT YÜKSELDİ!' : 'SEVİYEDEN KALDIN',
+                body: 'Sonraki sezon tekrar dene.',
+                color: result.value!.rose ? StageTheme.neonCyan : StageTheme.neonGold,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class RetireScreen extends HookConsumerWidget {
+  const RetireScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(careerProvider);
+    final done = useState(false);
+
+    void retire() {
+      ref.read(careerProvider.notifier).retire();
+      done.value = true;
+    }
+
+    if (done.value) {
+      return Scaffold(
+        backgroundColor: StageTheme.bgDeep,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('🏆', style: TextStyle(fontSize: 56)),
+                const SizedBox(height: 14),
+                const Text('EFSANE SKORU',
+                    style: TextStyle(color: StageTheme.neonGold, fontSize: 12, letterSpacing: 3)),
+                const SizedBox(height: 8),
+                Text('${state.careerScore}',
+                    style: TextStyle(color: Colors.white, fontSize: 48, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 20),
+                NeonButton(label: 'YENİ KARİYER', color: StageTheme.neonPink,
+                    width: double.infinity,
+                    onTap: () {
+                      ref.read(careerProvider.notifier)
+                          .newCareer(name: state.playerName, isGirlBand: state.isGirlBand);
+                      Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(builder: (_) => const HubScreen()));
+                    }),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: StageTheme.bgDeep,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        title: const Text('SOLO KARİYER / EMEKLİLİK', style: TextStyle(color: Colors.white, fontSize: 14)),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Grup ile kariyerine veda edip solo kariyere geçersin.\nKariyer skoru hesaplanır ve oyun sıfırlanır.',
+                style: TextStyle(color: StageTheme.textSub, fontSize: 13)),
+            const SizedBox(height: 20),
+            NeonButton(
+              label: '🎭 SOLO KARİYERE GEÇ',
+              color: StageTheme.neonPurple,
+              width: double.infinity,
+              onTap: retire,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StartView extends StatelessWidget {
+  final String title;
+  final String body;
+  final Color color;
+  final bool enabled;
+  final VoidCallback onTap;
+  const _StartView({required this.title, required this.body, required this.color,
+      required this.enabled, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(title, style: TextStyle(color: color, fontSize: 22,
+              fontWeight: FontWeight.w900, letterSpacing: 2)),
+          const SizedBox(height: 10),
+          Text(body, textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70, fontSize: 13.5, height: 1.5)),
+          const SizedBox(height: 28),
+          NeonButton(label: 'BAŞLA', color: color, width: double.infinity,
+              enabled: enabled, onTap: onTap),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResultView extends StatelessWidget {
+  final String title;
+  final String body;
+  final Color color;
+  const _ResultView({required this.title, required this.body, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(title, style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 10),
+          Text(body, textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70, fontSize: 13.5)),
+          const SizedBox(height: 24),
+          NeonButton(
+            label: 'GERİ DÖN',
+            color: color,
+            width: double.infinity,
+            onTap: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class TrainingResult {
+  final int stars;
+  final int success;
+  final int total;
+  TrainingResult(this.success, this.total)
+      : stars = success >= total - 1 ? 3 : success >= total - 2 ? 2 : 1;
+}
+
+class SeasonResult {
+  final bool rose;
+  SeasonResult(this.rose);
+}
+
+int _currentStageLevel(CareerState state) {
+  return ((state.fame ~/ 180) + 1).clamp(1, CareerStage.values.length);
 }

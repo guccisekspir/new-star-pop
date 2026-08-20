@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/start_screen.dart';
-import 'core/theme.dart';
+import 'ui/stage_theme.dart';
 
 /// New Star Pop — tererpop.com
 /// New Star Soccer'ın TR Pop girl band / boy band üye kariyeri versiyonu.
@@ -20,8 +20,8 @@ class NewStarPopApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: NSPTheme.darkStage,
-        colorSchemeSeed: NSPTheme.neonPink,
+        scaffoldBackgroundColor: StageTheme.bgDeep,
+        colorSchemeSeed: StageTheme.neonPink,
       ),
       home: const StartScreen(),
     );

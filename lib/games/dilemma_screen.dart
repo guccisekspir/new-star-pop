@@ -1,166 +1,205 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import '../ui/stage_theme.dart';
+import '../ui/particles.dart';
 import '../core/career_provider.dart';
-import '../core/theme.dart';
 
-/// Dilemma kartları — NSS rüşvet/skandal/kumarhane katmanı
-/// Rastgele bir olay kartı açılır; kararın gerçek sonuçları vardır.
-enum DilemmaType { secretOffer, nightClub, rest, fansEvent }
-
+/// Dilemma kartları — NSS gece hayatı/skandal anları karşılığı
+/// kind: nightClub | secretOffer | socialMedia | rest
 class DilemmaScreen extends HookConsumerWidget {
-  final DilemmaType type;
-  final VoidCallback onClose;
-
-  const DilemmaScreen({super.key, required this.type, required this.onClose});
+  final String kind;
+  final String Function(String choice) headlineGenerator;
+  const DilemmaScreen({super.key, required this.kind, required this.headlineGenerator});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final notifier = ref.read(careerProvider.notifier);
+    ref.watch(careerProvider);
+    final resolved = useState(false);
+    final picked = useState<String?>(null);
+    final burstController = useMemoized(() => BurstController());
 
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.all(24),
-        padding: const EdgeInsets.all(24),
-        decoration: NSPTheme.card(color: const Color(0xFF301245)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    final data = _dataFor(kind);
+
+    return Scaffold(
+      backgroundColor: StageTheme.bgDeep,
+      body: ParticleOverlay(
+        controller: burstController,
+        child: Stack(
           children: [
-            ..._cardsFor(type, notifier),
+            StageBackdrop(beamCount: 2, floor: false, tintColor: data.color),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: data.color.withValues(alpha: 0.6)),
+                        color: data.color.withValues(alpha: 0.12),
+                      ),
+                      child: Text(data.tag,
+                          style: TextStyle(color: data.color, fontSize: 11,
+                              letterSpacing: 3, fontWeight: FontWeight.w800)),
+                    ),
+                    const SizedBox(height: 26),
+                    Text(data.emoji, style: const TextStyle(fontSize: 64)),
+                    const SizedBox(height: 14),
+                    ShaderMask(
+                      shaderCallback: (b) => LinearGradient(
+                        colors: [data.color, data.color.withValues(alpha: 0.6)],
+                      ).createShader(b),
+                      child: Text(data.title,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white, fontSize: 24,
+                              fontWeight: FontWeight.w900, height: 1.2)),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(data.body,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: StageTheme.textSub, fontSize: 13.5, height: 1.5)),
+                    const SizedBox(height: 34),
+
+                    if (!resolved.value) ...[
+                      ...data.choices.map((c) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: NeonButton(
+                              label: c.label,
+                              color: c.color,
+                              width: double.infinity,
+                              selected: picked.value == c.id,
+                              onTap: () {
+                                picked.value = c.id;
+                                ref.read(careerProvider.notifier).resolveDilemma(c.id);
+                                resolved.value = true;
+                              },
+                            ),
+                          )),
+                    ] else ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.black45,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: data.color.withValues(alpha: 0.5)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('MAGAZİN',
+                                style: TextStyle(color: StageTheme.neonCyan, fontSize: 10,
+                                    letterSpacing: 3, fontWeight: FontWeight.w800)),
+                            const SizedBox(height: 8),
+                            Text(headlineGenerator(picked.value ?? ''),
+                                style: const TextStyle(color: Colors.white, fontSize: 14,
+                                    fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 10),
+                            Text(data.resultHint,
+                                style: TextStyle(color: StageTheme.textSub, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      NeonButton(label: 'DEVAM ET', color: data.color,
+                          width: double.infinity,
+                          onTap: () => Navigator.of(context).pop()),
+                    ],
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  List<Widget> _cardsFor(DilemmaType type, CareerNotifier notifier) {
-    switch (type) {
-      case DilemmaType.secretOffer:
-        return [
-          const Text('📄 GİZLİ TEKLİF',
-              style: TextStyle(color: NSPTheme.stageGold,
-                  fontSize: 20, fontWeight: FontWeight.bold,
-                  letterSpacing: 2)),
-          const SizedBox(height: 14),
-          const Text(
-            'Rakip plak şirketi seni tek başına almak istiyor. 500 ₺ peşin, ama gruba bunu söylememen gerekiyor...',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white, fontSize: 15, height: 1.5),
-          ),
-          const SizedBox(height: 20),
-          _DilemmaBtn('Kabul et (500 ₺, Grup -15, skandal riski)',
-              Colors.redAccent, () {
-            notifier.resolveDilemma('acceptOffer');
-            onClose();
-          }),
-          const SizedBox(height: 10),
-          _DilemmaBtn('Dürüst kal, menajere söyle',
-              NSPTheme.neonCyan, () {
-            notifier.resolveDilemma('honest');
-            onClose();
-          }),
-        ];
-      case DilemmaType.nightClub:
-        return [
-          const Text('🌙 GECE KULÜBÜ',
-              style: TextStyle(color: NSPTheme.neonPink,
-                  fontSize: 20, fontWeight: FontWeight.bold,
-                  letterSpacing: 2)),
-          const SizedBox(height: 14),
-          const Text(
-            'Konser sonrası arkadaşların gece kulübüne davet ediyor. Paparazziler de oradaymış...',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white, fontSize: 15, height: 1.5),
-          ),
-          const SizedBox(height: 20),
-          _DilemmaBtn('Git — hayat kısa (Medya -20, skandal)',
-              NSPTheme.neonPink, () {
-            notifier.resolveDilemma('nightClub');
-            onClose();
-          }),
-          const SizedBox(height: 10),
-          _DilemmaBtn('Otelde dinlen (Ses +35)',
-              NSPTheme.neonCyan, () {
-            notifier.resolveDilemma('rest');
-            onClose();
-          }),
-        ];
-      case DilemmaType.rest:
-        return [
-          const Text('🛋️ HAFTA SONU',
-              style: TextStyle(color: NSPTheme.neonCyan,
-                  fontSize: 20, fontWeight: FontWeight.bold,
-                  letterSpacing: 2)),
-          const SizedBox(height: 14),
-          const Text(
-            'Boş bir günün var. Nereye harcıyorsun?',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white, fontSize: 15, height: 1.5),
-          ),
-          const SizedBox(height: 20),
-          _DilemmaBtn('Ses istirahati (Ses +35, Hype -5)',
-              NSPTheme.neonCyan, () {
-            notifier.resolveDilemma('rest');
-            onClose();
-          }),
-          const SizedBox(height: 10),
-          _DilemmaBtn('Hayran etkinliği (Fanbase +8, Ses -5)',
-              NSPTheme.stageGold, () {
-            notifier.resolveDilemma('socialMedia');
-            onClose();
-          }),
-        ];
-      case DilemmaType.fansEvent:
-        return [
-          const Text('💖 HAYRAN BULUŞMASI',
-              style: TextStyle(color: NSPTheme.stageGold,
-                  fontSize: 20, fontWeight: FontWeight.bold,
-                  letterSpacing: 2)),
-          const SizedBox(height: 14),
-          const Text(
-            'İmza günü düzenlendi. Yorucu ama hayranların seni bekliyor.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white, fontSize: 15, height: 1.5),
-          ),
-          const SizedBox(height: 20),
-          _DilemmaBtn('Katıl (Fanbase +8, Ses -5)',
-              NSPTheme.stageGold, () {
-            notifier.resolveDilemma('socialMedia');
-            onClose();
-          }),
-          const SizedBox(height: 10),
-          _DilemmaBtn('Dinlen (Ses +35)',
-              NSPTheme.neonCyan, () {
-            notifier.resolveDilemma('rest');
-            onClose();
-          }),
-        ];
+  _DilemmaData _dataFor(String kind) {
+    switch (kind) {
+      case 'nightClub':
+        return _DilemmaData(
+          color: Colors.redAccent,
+          tag: 'GECE HAYATI',
+          emoji: '🍾',
+          title: 'Gece Kulübü Kavgası',
+          body: 'Ünlü bir gece kulübünde paparazziler seni fotoğrafladı. Bir tartışma çıktı. Ne yapacaksın?',
+          choices: [
+            _Choice('nightClub', 'Kavgaya devam et', Colors.redAccent),
+            _Choice('honest', 'Sakin kal, oradan ayrıl', StageTheme.neonCyan),
+          ],
+          resultHint: 'Medya ilişkileri değişti.',
+        );
+      case 'secretOffer':
+        return _DilemmaData(
+          color: StageTheme.neonGold,
+          tag: 'GİZLİ',
+          emoji: '🤫',
+          title: 'Gizli Kontrat Teklifi',
+          body: 'Rakip plak şirketi sana yüksek para teklif etti. Ama grubuna söylemeden görüşürsen...',
+          choices: [
+            _Choice('acceptOffer', 'Gizlice görüş (₺500, grup uyumu -)', StageTheme.neonGold),
+            _Choice('honest', 'Menajere söyle (menajer +)', StageTheme.neonCyan),
+          ],
+          resultHint: 'Para veya güven — seçimin senin.',
+        );
+      case 'socialMedia':
+        return _DilemmaData(
+          color: StageTheme.neonPink,
+          tag: 'FANLAR',
+          emoji: '💖',
+          title: 'Hayran Etkinliği',
+          body: 'Sosyal medyada canlı yayın yapabilirsin ama sesini yorarsın. Hayranların bekliyor!',
+          choices: [
+            _Choice('socialMedia', 'Canlı yayın yap', StageTheme.neonPink),
+            _Choice('rest', 'Sessiz kal, dinlen', StageTheme.neonPurple),
+          ],
+          resultHint: 'Hayranlar seni izliyor.',
+        );
+      case 'rest':
+        return _DilemmaData(
+          color: StageTheme.neonPurple,
+          tag: 'TOPARLAN',
+          emoji: '😴',
+          title: 'Dinlenme Günü',
+          body: 'Ses tellerin yoruldu. Bir gün dinlenirsen geri kazanırsın ama hype biraz düşer.',
+          choices: [
+            _Choice('rest', 'Dinlen (ses +35, hype -5)', StageTheme.neonPurple),
+            _Choice('socialMedia', 'Zorla devam et (hayran +)', StageTheme.neonPink),
+          ],
+          resultHint: 'Ses sağlığı en değerli kaynağın.',
+        );
+      default:
+        return _DilemmaData(
+          color: StageTheme.neonCyan,
+          tag: 'OLAY',
+          emoji: '❓',
+          title: 'Beklenmedik Olay',
+          body: 'Bir şeyler oldu. Sakin kal.',
+          choices: [_Choice('honest', 'Sakin kal', StageTheme.neonCyan)],
+          resultHint: 'Geçti.',
+        );
     }
   }
 }
 
-class _DilemmaBtn extends StatelessWidget {
+class _DilemmaData {
+  final Color color;
+  final String tag;
+  final String emoji;
+  final String title;
+  final String body;
+  final List<_Choice> choices;
+  final String resultHint;
+  _DilemmaData({required this.color, required this.tag, required this.emoji,
+      required this.title, required this.body, required this.choices, required this.resultHint});
+}
+
+class _Choice {
+  final String id;
   final String label;
   final Color color;
-  final VoidCallback onTap;
-  const _DilemmaBtn(this.label, this.color, this.onTap);
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color.withValues(alpha: 0.15),
-          foregroundColor: color,
-          side: BorderSide(color: color),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12)),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-        ),
-        child: Text(label,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-      ),
-    );
-  }
+  _Choice(this.id, this.label, this.color);
 }
